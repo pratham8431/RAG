@@ -9,6 +9,7 @@ from app.services.utils import (
 from app.services.openai_services import (
     store_vector_data_azure, process_user_query,
 )
+from app.services.gemini_services import generate_influencer_list
 import os
 import uuid
 import time
@@ -145,4 +146,44 @@ async def qna():
             "message": "Internal server error",
             "error": str(e),
             "logs": [{"type": "error", "message": f"System error: {str(e)}"}]
+        }), 500
+    
+@rag_routes.route('/discover-influencers', methods=['POST'])
+async def discover_influencers():
+    """
+    Endpoint to discover influencers based on search parameters
+    """
+    try:
+        data = request.get_json()
+        search_params = data.get('search_parameters')
+        
+        if not search_params:
+            return jsonify({
+                "success": False,
+                "message": "Search parameters are required"
+            }), 400
+
+        # Generate influencer list using Gemini
+        result = await generate_influencer_list(search_params)
+        
+        if not result.get('success'):
+            return jsonify({
+                "success": False,
+                "message": result.get('message', 'Failed to generate influencers'),
+                "error": result.get('error')
+            }), 500
+
+        return jsonify({
+            "success": True,
+            "count": result.get('count', 0),
+            "influencers": result.get('influencers', []),
+            "logs": result.get('logs', [])
+        })
+
+    except Exception as e:
+        logger.error(f"Error in influencer discovery: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": "Internal server error",
+            "error": str(e)
         }), 500
